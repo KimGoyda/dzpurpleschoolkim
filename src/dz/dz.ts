@@ -1,139 +1,70 @@
-'use strict';
-
-// Типизация импортов исключена по запросу
-declare function makeOrdinal(words: string): string;
-declare function isFinite(num: number): boolean;
-declare function isSafeNumber(num: number): boolean;
-
-const TEN: number = 10;
-const ONE_HUNDRED: number = 100;
-const ONE_THOUSAND: number = 1000;
-const ONE_MILLION: number = 1000000;
-const ONE_BILLION: number = 1000000000;
-const ONE_TRILLION: number = 1000000000000;
-const ONE_QUADRILLION: number = 1000000000000000;
-const MAX: number = 9007199254740992;
-
-const LESS_THAN_TWENTY: string[] = [
-    'zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten',
-    'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen', 'sixteen', 'seventeen', 'eighteen', 'nineteen'
-];
-const TENTHS_LESS_THAN_HUNDRED: string[] = [
-    'zero', 'ten', 'twenty', 'thirty', 'forty', 'fifty', 'sixty', 'seventy', 'eighty', 'ninety'
-];
-
-/**
- * Converts an integer into words.
- * If number is decimal, the decimals will be removed.
- * @example toWords(12) => 'twelve'
- * @param number
- * @param [asOrdinal]
- * @returns
- */
-function toWords(number: number | string, asOrdinal?: boolean): string {
-    let words: string;
-    // num преобразуется в число с типом number, так как parseInt всегда возвращает number (или NaN)
-    const num: number = parseInt(number as string, 10); 
-
-    if (!isFinite(num)) {
-        throw new TypeError(
-            'Not a finite number: ' + number + ' (' + typeof number + ')'
-        );
-    }
-    if (!isSafeNumber(num)) {
-        throw new RangeError(
-            'Input is not a safe number, it’s either too large or too small.'
-        );
-    }
-    words = generateWords(num);
-    return asOrdinal ? makeOrdinal(words) : words;
+// 1. Используем enum для более безопасной работы с ключами или для статусов
+enum UserKeys {
+    ID = 'id',
+    FIRST_NAME = 'firstName',
+    LAST_NAME = 'lastName',
+    EMAIL = 'email'
 }
 
+// 2. Интерфейсы для типизации полученных данных
+interface User {
+    [UserKeys.ID]: number;
+    [UserKeys.FIRST_NAME]: string;
+    [UserKeys.LAST_NAME]: string;
+    [UserKeys.EMAIL]: string;
+    // Добавляем другие поля, которые могут быть в ответе, чтобы избежать ошибок
+    age: number;
+    gender: string;
+    // ...
+}
+
+interface UserResponse {
+    users: User[];
+    total: number;
+    skip: number;
+    limit: number;
+}
+
+const API_URL: string = 'https://dummyjson.com/users';
+
 /**
- * Рекурсивная функция, которая генерирует словесное представление числа.
- * @param number Число, которое нужно преобразовать (абсолютное значение, так как знак обрабатывается в начале).
- * @param [words] Массив, используемый для накопления слов в рекурсии.
- * @returns Словесное представление числа.
+ * Отправляет запрос на получение списка пользователей, выводит часть данных
+ * и обрабатывает ошибки.
  */
-function generateWords(number: number, words?: string[]): string {
-    let remainder: number;
-    let word: string;
-    
-    // Аргументы arguments[1] используется только для совместимости с JS.
-    // В TS лучше использовать явный параметр words.
-    let currentWords: string[] | undefined = words;
+async function fetchAndDisplayUsers(): Promise<void> {
+    console.log('--- Отправка запроса ---');
+    try {
+        const response: Response = await fetch(API_URL);
 
-    // We’re done
-    if (number === 0) {
-        if (!currentWords) {
-            return 'zero';
+        // Обработка HTTP-ошибок (статусы 4xx, 5xx)
+        if (!response.ok) {
+            throw new Error(`Ошибка HTTP: ${response.status} (${response.statusText})`);
         }
-        return currentWords.join(' ').replace(/,$/, '');
-    }
-    
-    // First run
-    if (!currentWords) {
-        currentWords = [];
-    }
 
-    // If negative, prepend “minus”
-    if (number < 0) {
-        currentWords.push('minus');
-        number = Math.abs(number);
-    }
-    
-    // Блок if-else должен быть охвачен для всех сценариев,
-    // чтобы компилятор знал, что 'word' будет инициализировано.
-    // Если number <= MAX, слово будет инициализировано.
+        const data: UserResponse = await response.json();
+        const users: User[] = data.users;
 
-    if (number < 20) {
-        remainder = 0;
-        word = LESS_THAN_TWENTY[number];
-
-    } else if (number < ONE_HUNDRED) {
-        remainder = number % TEN;
-        word = TENTHS_LESS_THAN_HUNDRED[Math.floor(number / TEN)];
+        console.log(`Получено пользователей: ${users.length}`);
+        console.log('--- Вывод данных ---');
         
-        if (remainder) {
-            word += '-' + LESS_THAN_TWENTY[remainder];
-            remainder = 0;
+        users.slice(0, 5).forEach((user: User, index: number) => {
+            console.log(
+                `[${index + 1}] ID: ${user[UserKeys.ID]}, Имя: ${user[UserKeys.FIRST_NAME]} ${user[UserKeys.LAST_NAME]}, Email: ${user[UserKeys.EMAIL]}`
+            );
+        });
+
+    } catch (error) {
+        // Обработка ошибок сети, JSON-парсинга и явных исключений
+        console.error('--- Ошибка исключения ---');
+        // Убедимся, что выводим сообщение, если error - это объект Error
+        if (error instanceof Error) {
+            console.error(`Не удалось получить данные: ${error.message}`);
+        } else {
+            console.error('Произошла неизвестная ошибка.', error);
         }
-
-    } else if (number < ONE_THOUSAND) {
-        remainder = number % ONE_HUNDRED;
-        word = generateWords(Math.floor(number / ONE_HUNDRED)) + ' hundred';
-
-    } else if (number < ONE_MILLION) {
-        remainder = number % ONE_THOUSAND;
-        word = generateWords(Math.floor(number / ONE_THOUSAND)) + ' thousand,';
-
-    } else if (number < ONE_BILLION) {
-        remainder = number % ONE_MILLION;
-        word = generateWords(Math.floor(number / ONE_MILLION)) + ' million,';
-
-    } else if (number < ONE_TRILLION) {
-        remainder = number % ONE_BILLION;
-        word = generateWords(Math.floor(number / ONE_BILLION)) + ' billion,';
-
-    } else if (number < ONE_QUADRILLION) {
-        remainder = number % ONE_TRILLION;
-        word = generateWords(Math.floor(number / ONE_TRILLION)) + ' trillion,';
-
-    } else if (number <= MAX) {
-        remainder = number % ONE_QUADRILLION;
-        word = generateWords(Math.floor(number / ONE_QUADRILLION)) +
-        ' quadrillion,';
-    } else {
-         // На случай, если number > MAX (хотя это должно быть отловлено isSafeNumber,
-         // но для полной инициализации 'word' нужно что-то вернуть).
-         // В данном контексте, благодаря isSafeNumber, эта ветка не должна быть достигнута.
-         // Но для TS это необходимо.
-         return currentWords.join(' ').replace(/,$/, '');
     }
-
-    currentWords.push(word);
-    return generateWords(remainder, currentWords);
+    console.log('--- Завершение операции ---');
 }
 
-// Модульный экспорт
-module.exports = toWords;
+// Вызов функции
+fetchAndDisplayUsers();
