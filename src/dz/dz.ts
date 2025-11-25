@@ -42,3 +42,16 @@ class User {
     name: string = "Alice Johnson";
 }
 
+// --- Тестирование ---
+const person = new User();
+
+// 1. Первый console.log теперь возвращает 30
+console.log(`Начальный возраст (должен быть 30): ${person.age}`); 
+
+// 2. Попытка присвоить невалидное значение (0 <= 0)
+person.age = 0; 
+console.log(`Текущий возраст (должен быть 30): ${person.age}`); 
+
+// 3. Попытка присвоить валидное значение (20 > 0)
+person.age = 20;
+console.log(`Текущий возраст (должен быть 20): ${person.age}`);
