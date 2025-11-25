@@ -1,34 +1,33 @@
-// 1. Enum для строгой типизации методов запроса
-enum HttpMethod {
+// 1. Enum экспортируется
+export enum HttpMethod {
     GET = 'GET',
     POST = 'POST',
     PUT = 'PUT',
     DELETE = 'DELETE'
 }
 
-// 2. Интерфейс для финальных опций fetch
 interface RequestOptions extends RequestInit {
     method: HttpMethod;
     headers?: HeadersInit;
     body?: string;
 }
 
-class RequestBuilder {
-    private url: string;
+// 2. Класс экспортируется
+export class RequestBuilder {
+    private _url: string; //
     private options: RequestOptions;
 
     constructor() {
-        // Инициализация базовых опций
-        this.url = '';
+        this._url = '';
         this.options = { 
             method: HttpMethod.GET,
             headers: {}
         };
     }
 
-    public url(url: string): RequestBuilder {
-        this.url = url;
-        return this; // Возвращаем this для цепочки вызовов
+    public url(urlValue: string): RequestBuilder {
+        this._url = urlValue; // Используем _url
+        return this;
     }
 
     public method(method: HttpMethod): RequestBuilder {
@@ -38,7 +37,6 @@ class RequestBuilder {
 
     public body(body: object | string): RequestBuilder {
         if (typeof body === 'object') {
-            // Если это объект, устанавливаем заголовок Content-Type и сериализуем
             this.header('Content-Type', 'application/json');
             this.options.body = JSON.stringify(body);
         } else {
@@ -48,23 +46,24 @@ class RequestBuilder {
     }
 
     public header(key: string, value: string): RequestBuilder {
-        // Проверяем, что headers — это объект
         if (!this.options.headers) {
             this.options.headers = {};
         }
-        // Добавляем заголовок
         (this.options.headers as Record<string, string>)[key] = value;
         return this;
     }
 
+    /**
+     * Финальная функция, которая выполняет fetch-запрос.
+     */
     public async exec(): Promise<Response> {
-        if (!this.url) {
+        if (!this._url) {
             throw new Error("URL не может быть пустым. Используйте .url() перед .exec().");
         }
-        console.log(`Выполнение запроса: ${this.options.method} ${this.url}`);
+        console.log(`Выполнение запроса: ${this.options.method} ${this._url}`);
         console.log(`Опции: ${JSON.stringify(this.options)}`);
 
-        // Выполняем fetch с собранными опциями
-        return fetch(this.url, this.options);
+        // Используем this._url для выполнения запроса
+        return fetch(this._url, this.options);
     }
 }
