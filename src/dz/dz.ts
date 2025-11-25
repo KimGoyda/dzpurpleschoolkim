@@ -1,139 +1,117 @@
-'use strict';
-
-// Типизация импортов исключена по запросу
-declare function makeOrdinal(words: string): string;
-declare function isFinite(num: number): boolean;
-declare function isSafeNumber(num: number): boolean;
-
-const TEN: number = 10;
-const ONE_HUNDRED: number = 100;
-const ONE_THOUSAND: number = 1000;
-const ONE_MILLION: number = 1000000;
-const ONE_BILLION: number = 1000000000;
-const ONE_TRILLION: number = 1000000000000;
-const ONE_QUADRILLION: number = 1000000000000000;
-const MAX: number = 9007199254740992;
-
-const LESS_THAN_TWENTY: string[] = [
-    'zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten',
-    'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen', 'sixteen', 'seventeen', 'eighteen', 'nineteen'
-];
-const TENTHS_LESS_THAN_HUNDRED: string[] = [
-    'zero', 'ten', 'twenty', 'thirty', 'forty', 'fifty', 'sixty', 'seventy', 'eighty', 'ninety'
-];
-
-/**
- * Converts an integer into words.
- * If number is decimal, the decimals will be removed.
- * @example toWords(12) => 'twelve'
- * @param number
- * @param [asOrdinal]
- * @returns
- */
-function toWords(number: number | string, asOrdinal?: boolean): string {
-    let words: string;
-    // num преобразуется в число с типом number, так как parseInt всегда возвращает number (или NaN)
-    const num: number = parseInt(number as string, 10); 
-
-    if (!isFinite(num)) {
-        throw new TypeError(
-            'Not a finite number: ' + number + ' (' + typeof number + ')'
-        );
-    }
-    if (!isSafeNumber(num)) {
-        throw new RangeError(
-            'Input is not a safe number, it’s either too large or too small.'
-        );
-    }
-    words = generateWords(num);
-    return asOrdinal ? makeOrdinal(words) : words;
+interface MapNode<K, V> {
+    key: K;
+    value: V;
+    next: MapNode<K, V> | null;
 }
 
-/**
- * Рекурсивная функция, которая генерирует словесное представление числа.
- * @param number Число, которое нужно преобразовать (абсолютное значение, так как знак обрабатывается в начале).
- * @param [words] Массив, используемый для накопления слов в рекурсии.
- * @returns Словесное представление числа.
- */
-function generateWords(number: number, words?: string[]): string {
-    let remainder: number;
-    let word: string;
-    
-    // Аргументы arguments[1] используется только для совместимости с JS.
-    // В TS лучше использовать явный параметр words.
-    let currentWords: string[] | undefined = words;
+type Bucket<K, V> = MapNode<K, V> | null;
 
-    // We’re done
-    if (number === 0) {
-        if (!currentWords) {
-            return 'zero';
-        }
-        return currentWords.join(' ').replace(/,$/, '');
-    }
-    
-    // First run
-    if (!currentWords) {
-        currentWords = [];
+class CustomMap<K, V> {
+    private buckets: Bucket<K, V>[];
+    private capacity: number;
+    private size: number;
+
+    constructor(initialCapacity: number = 10) {
+        this.capacity = initialCapacity > 0 ? initialCapacity : 10;
+        this.buckets = new Array(this.capacity).fill(null);
+        this.size = 0;
     }
 
-    // If negative, prepend “minus”
-    if (number < 0) {
-        currentWords.push('minus');
-        number = Math.abs(number);
-    }
-    
-    // Блок if-else должен быть охвачен для всех сценариев,
-    // чтобы компилятор знал, что 'word' будет инициализировано.
-    // Если number <= MAX, слово будет инициализировано.
 
-    if (number < 20) {
-        remainder = 0;
-        word = LESS_THAN_TWENTY[number];
-
-    } else if (number < ONE_HUNDRED) {
-        remainder = number % TEN;
-        word = TENTHS_LESS_THAN_HUNDRED[Math.floor(number / TEN)];
+    private hash(key: K): number {
+        // Преобразуем ключ в строку для вычисления хэша
+        const keyString = String(key);
+        let hashValue = 0;
         
-        if (remainder) {
-            word += '-' + LESS_THAN_TWENTY[remainder];
-            remainder = 0;
+        for (let i = 0; i < keyString.length; i++) {
+            // Простая хэш-функция: сумма кодов символов
+            hashValue = (hashValue + keyString.charCodeAt(i)) % this.capacity;
         }
-
-    } else if (number < ONE_THOUSAND) {
-        remainder = number % ONE_HUNDRED;
-        word = generateWords(Math.floor(number / ONE_HUNDRED)) + ' hundred';
-
-    } else if (number < ONE_MILLION) {
-        remainder = number % ONE_THOUSAND;
-        word = generateWords(Math.floor(number / ONE_THOUSAND)) + ' thousand,';
-
-    } else if (number < ONE_BILLION) {
-        remainder = number % ONE_MILLION;
-        word = generateWords(Math.floor(number / ONE_MILLION)) + ' million,';
-
-    } else if (number < ONE_TRILLION) {
-        remainder = number % ONE_BILLION;
-        word = generateWords(Math.floor(number / ONE_BILLION)) + ' billion,';
-
-    } else if (number < ONE_QUADRILLION) {
-        remainder = number % ONE_TRILLION;
-        word = generateWords(Math.floor(number / ONE_TRILLION)) + ' trillion,';
-
-    } else if (number <= MAX) {
-        remainder = number % ONE_QUADRILLION;
-        word = generateWords(Math.floor(number / ONE_QUADRILLION)) +
-        ' quadrillion,';
-    } else {
-         // На случай, если number > MAX (хотя это должно быть отловлено isSafeNumber,
-         // но для полной инициализации 'word' нужно что-то вернуть).
-         // В данном контексте, благодаря isSafeNumber, эта ветка не должна быть достигнута.
-         // Но для TS это необходимо.
-         return currentWords.join(' ').replace(/,$/, '');
+        return hashValue;
     }
 
-    currentWords.push(word);
-    return generateWords(remainder, currentWords);
-}
 
-// Модульный экспорт
-module.exports = toWords;
+    public set(key: K, value: V): void {
+        const index = this.hash(key);
+        let current: MapNode<K, V> | null = this.buckets[index];
+        
+
+        while (current) {
+            // Если ключ найден, обновляем значение и выходим
+            if (current.key === key) {
+                current.value = value;
+                return;
+            }
+            current = current.next;
+        }
+
+        const newNode: MapNode<K, V> = { key, value, next: this.buckets[index] };
+        this.buckets[index] = newNode;
+        this.size++;
+
+    }
+
+    /**
+     * Возвращает значение по ключу.
+     */
+    public get(key: K): V | undefined {
+        const index = this.hash(key);
+        let current = this.buckets[index];
+
+        // Итерация по связанному списку
+        while (current) {
+            if (current.key === key) {
+                return current.value;
+            }
+            current = current.next;
+        }
+
+        // Ключ не найден
+        return undefined;
+    }
+
+    /**
+     * Удаляет элемент по ключу.
+     */
+    public delete(key: K): boolean {
+        const index = this.hash(key);
+        let current: MapNode<K, V> | null = this.buckets[index];
+        let previous: MapNode<K, V> | null = null;
+
+        while (current) {
+            if (current.key === key) {
+                // Если элемент — первый в списке (head)
+                if (previous === null) {
+                    this.buckets[index] = current.next;
+                } else {
+                    // Если элемент в середине или конце, перенаправляем ссылку
+                    previous.next = current.next;
+                }
+                this.size--;
+                return true;
+            }
+            previous = current;
+            current = current.next;
+        }
+
+        // Ключ не найден
+        return false;
+    }
+
+    /**
+     * Очищает всю таблицу, удаляя все элементы.
+     */
+    public clear(): void {
+        // Создаем новый пустой массив корзин и сбрасываем размер
+        this.buckets = new Array(this.capacity).fill(null);
+        this.size = 0;
+        console.log("Map очищена.");
+    }
+    
+    /**
+     * Возвращает текущее количество элементов в Map.
+     */
+    public getSize(): number {
+        return this.size;
+    }
+}
