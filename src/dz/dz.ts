@@ -1,24 +1,29 @@
-
 function allowFunc<T>(validatorFunc: (newValue: T) => boolean) {
-    // Декоратор свойства принимает target (класс), key (имя свойства)
+    
+    // Декоратор свойства
     return function (target: any, key: string | symbol) {
         
-        // Внутреннее приватное поле для хранения фактического значения
+        let initialValue: T | undefined = target[key];
+
+        // Внутренний ключ для хранения фактического значения на экземпляре
         const internalKey = `__${String(key)}`;
 
-        // Создаем геттер и сеттер для свойства, используя Object.defineProperty
         Object.defineProperty(target, key, {
             
-            // Геттер: возвращает значение из внутреннего поля
-            get: function () {
+            // Геттер
+            get: function (this: any): T {
+                // Если внутреннее поле не инициализировано, инициализируем его начальным значением
+                if (this[internalKey] === undefined) {
+                     this[internalKey] = initialValue;
+                }
                 return this[internalKey];
             },
 
-            set: function (newValue: T) {
+            // Сеттер
+            set: function (this: any, newValue: T) {
                 if (validatorFunc(newValue)) {
                     this[internalKey] = newValue;
                 } else {
-                    // Опционально: вывод предупреждения, если присваивание отклонено
                     console.warn(`[${String(key)}]: Присваивание значения ${newValue} отклонено валидатором.`);
                 }
             },
@@ -29,33 +34,11 @@ function allowFunc<T>(validatorFunc: (newValue: T) => boolean) {
 }
 
 class User {
-    // Применяем декоратор: позволяет присваивание, только если a > 0
+    // Начальное значение 30 будет сохранено и использовано при первом доступе
     @allowFunc<number>((a: number) => a > 0)
-    age: number = 30; // Инициализация происходит до применения декоратора set
+    age: number = 30; 
 
     @allowFunc<string>((s: string) => s.length >= 5)
-    name: string = "Alice";
+    name: string = "Alice Johnson";
 }
 
-// --- Тестирование ---
-const person = new User();
-
-// Начальное значение
-console.log(`Начальный возраст: ${person.age}`); // 30
-console.log(`Начальное имя: ${person.name}`);    // Alice
-
-console.log('\nПопытка присвоить 0 (невалидно):');
-person.age = 0; 
-console.log(`Текущий возраст: ${person.age}`); // 30 (не изменилось)
-
-console.log('\nПопытка присвоить "Bob" (длина < 5):');
-person.name = "Bob";
-console.log(`Текущее имя: ${person.name}`); // Alice (не изменилось)
-
-console.log('\nПопытка присвоить 20 (валидно):');
-person.age = 20;
-console.log(`Текущий возраст: ${person.age}`); // 20
-
-console.log('\nПопытка присвоить "Charlie" (валидно):');
-person.name = "Charlie";
-console.log(`Текущее имя: ${person.name}`); // Charlie
